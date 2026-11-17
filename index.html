@@ -115,6 +115,7 @@ textarea{width:100%;min-height:92px;margin-top:8px;border:1.5px solid var(--line
 .send{width:100%;margin-top:14px;border:none;border-radius:12px;background:var(--leaf);color:var(--on-leaf);padding:14px;font-size:16px;font-weight:700}
 .send:disabled{opacity:.4}
 
+.sent{margin:8px 0 0;font-size:12px;font-weight:700;color:var(--leaf)}
 /* about */
 .about{margin-top:32px;border-top:1px solid var(--line);padding-top:4px}
 .about h2{font-size:14px;color:var(--sub)}
@@ -367,7 +368,8 @@ function renderMenu(){
     const r = S.myRatings[x.item], open = openItem === x.item, k = m.indexOf(x);
     return `<div class="mi"><button data-item="${k}" aria-expanded="${open}"><span class="nm">${esc(x.item)}</span><span class="rt${r?' done':''}">${r?FACE[r]:'評価する'}</span></button>
       ${open?`<div class="panel"><div class="faces">${FACES.map(([v,e,l])=>`<button data-rate="${v}" data-k="${k}" aria-pressed="${r===v}"><span>${e}</span>${l}</button>`).join('')}</div>
-      ${r?`<div class="inline"><input type="text" id="note_${k}" maxlength="150" placeholder="ひとことあればどうぞ（任意）" aria-label="${esc(x.item)}へのひとこと"><button data-note="${k}">送る</button></div>`:''}</div>`:''}</div>`;
+      ${r?`<p class="sent">✓ 評価を送りました。ひとことは書かなくてもOKです</p>
+      <div class="inline"><input type="text" id="note_${k}" maxlength="150" placeholder="ひとこと（任意）" aria-label="${esc(x.item)}へのひとこと（任意）"><button data-note="${k}">送る</button></div>`:''}</div>`:''}</div>`;
   }).join('') + (m.length > 6 ? `<button class="more" id="moreBtn">${showAll?'閉じる':'ほかのメニューも見る（'+(m.length-6)+'品）'}</button>` : '');
   if (keep && $('note_' + idx(openItem))) $('note_' + idx(openItem)).value = keep;
 }
@@ -387,9 +389,9 @@ $('menuList').onclick = async e => {
   const nb = e.target.closest('[data-note]');
   if (nb) {
     const k = +nb.dataset.note, inp = $('note_' + k), v = inp.value.trim();
-    if (!v) { toast('ひとことを書いてください'); return; }
+    if (!v) { openItem = null; renderMenu(); toast('評価を送りました'); return; }  // ひとことは任意。空なら閉じるだけ
     nb.disabled = true;
-    try { await api('post', { type: 'comment', text: '【' + S.menu[k].item + '】' + v, author: '匿名' }); inp.value = ''; toast('送りました'); }
+    try { await api('post', { type: 'comment', text: '【' + S.menu[k].item + '】' + v, author: '匿名' }); inp.value = ''; openItem = null; renderMenu(); toast('ひとことも送りました。ありがとうございます'); }
     catch (err) { toast(errMsg(err)); }
     nb.disabled = false; return;
   }
