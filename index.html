@@ -119,6 +119,14 @@ textarea{width:100%;min-height:92px;margin-top:8px;border:1.5px solid var(--line
 .send:disabled{opacity:.4}
 
 .sent{margin:8px 0 0;font-size:12px;font-weight:700;color:var(--leaf)}
+.mi .sm{display:block;font-size:12px;color:var(--sub);font-weight:400;margin-top:2px}
+.nh{margin:4px 0 0;font-size:11px;color:var(--sub)}
+.voices{margin-top:12px;border-top:1px dashed var(--line);padding-top:8px}
+.voices .vh{margin:0 0 6px;font-size:12px;font-weight:700;color:var(--sub)}
+.vc{background:var(--bg);border-radius:8px;padding:6px 10px;margin-bottom:6px;font-size:13px;line-height:1.6}
+.vc p{margin:0;word-break:break-word}
+.vc .vr{margin-top:4px;font-size:12px;color:var(--sub)}
+.vc .vr b{color:var(--leaf);margin-right:6px}
 /* about */
 .about{margin-top:32px;border-top:1px solid var(--line);padding-top:4px}
 .about h2{font-size:14px;color:var(--sub)}
@@ -192,7 +200,7 @@ textarea{width:100%;min-height:92px;margin-top:8px;border:1.5px solid var(--line
 
     <div class="today">
       <p class="lbl">今日のメニュー</p>
-      <p class="hint" style="margin:0 0 4px">食べたものをタップして、ひとこと評価をどうぞ</p>
+      <p class="hint" style="margin:0 0 4px">食べたものをタップして評価すると、みんなの評価も見られます</p>
       <div id="menuList"></div>
     </div>
 
@@ -217,6 +225,7 @@ textarea{width:100%;min-height:92px;margin-top:8px;border:1.5px solid var(--line
         <li>名前は表示されません。匿名か、自分で入れた部署名だけが出ます</li>
         <li>LINEの名前やアイコンは取得しません（本人確認用の番号だけを使います）</li>
         <li id="aboutApproval" hidden>リクエストは店長が確認してから、みんなに公開されます</li>
+        <li>メニューへの評価とひとことは、匿名でみんなに共有されます</li>
         <li>個人への批判など、ふさわしくない内容は店長が削除することがあります</li>
       </ul>
     </section>
@@ -377,10 +386,13 @@ function renderMenu(){
   const list = showAll ? m : m.slice(0, 6);
   $('menuList').innerHTML = list.map((x, i) => {
     const r = S.myRatings[x.item], open = openItem === x.item, k = m.indexOf(x);
-    return `<div class="mi"><button data-item="${k}" aria-expanded="${open}"><span class="nm">${esc(x.item)}</span><span class="rt${r?' done':''}">${r?FACE[r]:'評価する'}</span></button>
+    const sm = x.sum ? `<span class="sm">😋 ${x.sum.good}　🙂 ${x.sum.ok}　🤔 ${x.sum.meh}${x.voices && x.voices.length ? '　💬 ' + x.voices.length : ''}</span>` : '';
+    const vs = x.voices && x.voices.length ? `<div class="voices"><p class="vh">みんなのひとこと</p>${x.voices.map(v => `<div class="vc"><p>${esc(v.text)}${v.mine ? '<span class="mine">あなた</span>' : ''}</p>${v.reply ? `<p class="vr"><b>店長より</b>${esc(v.reply)}</p>` : ''}</div>`).join('')}</div>` : '';
+    return `<div class="mi"><button data-item="${k}" aria-expanded="${open}"><span><span class="nm">${esc(x.item)}</span>${sm}</span><span class="rt${r?' done':''}">${r?FACE[r]:'評価する'}</span></button>
       ${open?`<div class="panel"><div class="faces">${FACES.map(([v,e,l])=>`<button data-rate="${v}" data-k="${k}" aria-pressed="${r===v}"><span>${e}</span>${l}</button>`).join('')}</div>
       ${r?`<p class="sent">✓ 評価を送りました。ひとことは書かなくてもOKです</p>
-      <div class="inline"><input type="text" id="note_${k}" maxlength="150" placeholder="ひとこと（任意）" aria-label="${esc(x.item)}へのひとこと（任意）"><button data-note="${k}">送る</button></div>`:''}</div>`:''}</div>`;
+      <div class="inline"><input type="text" id="note_${k}" maxlength="150" placeholder="ひとこと（任意）" aria-label="${esc(x.item)}へのひとこと（任意）"><button data-note="${k}">送る</button></div>
+      <p class="nh">ひとことは匿名でみんなに表示されます</p>${vs}`:''}</div>`:''}</div>`;
   }).join('') + (m.length > 6 ? `<button class="more" id="moreBtn">${showAll?'閉じる':'ほかのメニューも見る（'+(m.length-6)+'品）'}</button>` : '');
   if (keep && $('note_' + idx(openItem))) $('note_' + idx(openItem)).value = keep;
 }
@@ -393,7 +405,11 @@ $('menuList').onclick = async e => {
     if (busy) return; busy = true;
     const item = S.menu[+rb.dataset.k].item, prev = S.myRatings[item];
     S.myRatings[item] = rb.dataset.rate; renderMenu();
-    try { await api('rate', { item, r: rb.dataset.rate }); toast('ありがとうございます。店長に届きました'); }
+    try {
+      const res = await api('rate', { item, r: rb.dataset.rate });
+      const m = S.menu.find(x => x.item === item); if (m && res) { m.sum = res.sum; m.voices = res.voices; }
+      renderMenu(); toast('ありがとうございます。みんなの評価も見られます');
+    }
     catch (err) { if (prev) S.myRatings[item] = prev; else delete S.myRatings[item]; renderMenu(); toast(errMsg(err)); }
     busy = false; return;
   }
@@ -402,7 +418,7 @@ $('menuList').onclick = async e => {
     const k = +nb.dataset.note, inp = $('note_' + k), v = inp.value.trim();
     if (!v) { openItem = null; renderMenu(); toast('評価を送りました'); return; }  // ひとことは任意。空なら閉じるだけ
     nb.disabled = true;
-    try { const res = await api('post', { type: 'comment', text: '【' + S.menu[k].item + '】' + v, author: '匿名' }); inp.value = ''; openItem = null; if (res && res.state) setState(res.state); else renderMenu(); toast('ひとことも送りました。ありがとうございます'); }
+    try { const res = await api('post', { type: 'comment', item: S.menu[k].item, text: '【' + S.menu[k].item + '】' + v, author: '匿名' }); inp.value = ''; openItem = null; if (res && res.state) setState(res.state); else renderMenu(); toast('ひとことも送りました。ありがとうございます'); }
     catch (err) { toast(errMsg(err)); }
     nb.disabled = false; return;
   }
