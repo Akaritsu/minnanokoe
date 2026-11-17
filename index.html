@@ -115,6 +115,13 @@ textarea{width:100%;min-height:92px;margin-top:8px;border:1.5px solid var(--line
 .send{width:100%;margin-top:14px;border:none;border-radius:12px;background:var(--leaf);color:var(--on-leaf);padding:14px;font-size:16px;font-weight:700}
 .send:disabled{opacity:.4}
 
+/* about */
+.about{margin-top:32px;border-top:1px solid var(--line);padding-top:4px}
+.about h2{font-size:14px;color:var(--sub)}
+.about ul{margin:0;padding-left:18px;font-size:12px;color:var(--sub);line-height:1.8}
+.pend{margin-top:8px;font-size:12px;color:var(--sub);background:var(--surface);border-radius:6px;padding:4px 10px;display:inline-block}
+.badge-p{display:inline-block;font-size:11px;font-weight:700;color:var(--hanko);border:1px solid var(--hanko);border-radius:4px;padding:0 6px;margin:0 4px 4px 0}
+.acts .approve{border-color:var(--leaf);background:var(--leaf);color:var(--on-leaf)}
 /* manager */
 .cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .cats label{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:4px 12px 4px 8px;font-size:13px;background:var(--surface);cursor:pointer}
@@ -199,6 +206,16 @@ textarea{width:100%;min-height:92px;margin-top:8px;border:1.5px solid var(--line
       </div>
       <div id="list"></div>
     </section>
+
+    <section class="about" aria-labelledby="aboutTitle">
+      <h2 id="aboutTitle">このページについて</h2>
+      <ul>
+        <li>名前は表示されません。匿名か、自分で入れた部署名だけが出ます</li>
+        <li>LINEの名前やアイコンは取得しません（本人確認用の番号だけを使います）</li>
+        <li>リクエストは店長が確認してから、みんなに公開されます</li>
+        <li>個人への批判など、ふさわしくない内容は公開せずに削除することがあります</li>
+      </ul>
+    </section>
   </main>
 
   <!-- ===== 店長の画面（?mgr=1 で開く） ===== -->
@@ -221,9 +238,9 @@ textarea{width:100%;min-height:92px;margin-top:8px;border:1.5px solid var(--line
         <h2>数字</h2>
         <div class="stats" id="stats"></div>
         <h2>届いた声</h2>
-        <p class="hint">返信は「時期か次の動き」を一言入れないと送れません。放置に見せないためのルールです。</p>
+        <p class="hint">「承認待ち」のリクエストは、公開するまで社員の画面に出ません。返信は「時期か次の動き」を一言入れないと送れません。</p>
         <div class="chips" id="mfilters">
-          <button data-f="open" aria-pressed="true">未返信</button>
+          <button data-f="open" aria-pressed="true">未対応</button>
           <button data-f="all" aria-pressed="false">すべて</button>
         </div>
         <div id="mgrList"></div>
@@ -261,7 +278,7 @@ textarea{width:100%;min-height:92px;margin-top:8px;border:1.5px solid var(--line
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-hidden="true">
   <div class="grab"></div>
   <h3 id="sheetTitle">どんなメニューが食べたい？</h3>
-  <p class="hint" style="margin:0">いいねが多いものから、店長が毎週検討します。</p>
+  <p class="hint" style="margin:0">店長が確認してから公開します。いいねが多いものから毎週検討します。</p>
   <textarea id="text" maxlength="200" placeholder="例：寒い日に具だくさんのスープが食べたい" aria-label="リクエスト内容"></textarea>
   <div class="ideas" id="ideas">
     <button>週1でカレー</button><button>ヘルシーな日替わり</button><button>午後の甘いもの</button><button>ご当地の味</button>
@@ -380,9 +397,9 @@ function steps(st){const n=STEP[st]||0;return `<div class="steps" aria-label="�
 function ticket(p){
   const rep = p.reply ? `<div class="reply"><b>${p.status==='adopted'?'採用しました':'検討します'}</b>${esc(p.reply)}</div>` : '';
   const label = p.type === 'comment' ? 'ひとこと' : esc(p.author);
-  const like = p.type === 'req' ? `<button class="like" data-like="${p.id}" aria-pressed="${p.liked}" aria-label="いいね ${p.likes}件"><span class="h">${p.liked?'♥':'♡'}</span><span class="n">${p.likes}</span></button>` : '';
+  const like = p.type === 'req' && p.status !== 'pending' ? `<button class="like" data-like="${p.id}" aria-pressed="${p.liked}" aria-label="いいね ${p.likes}件"><span class="h">${p.liked?'♥':'♡'}</span><span class="n">${p.likes}</span></button>` : '';
   return `<div class="ticket${p.status==='adopted'?' adopted':''}"><div class="stub">${like}</div>
-   <div class="body"><p class="req">${esc(p.text)}</p><div class="meta">${label}${p.mine?'<span class="mine">あなたの声</span>':''}</div>${rep}${steps(p.status)}</div>
+   <div class="body"><p class="req">${esc(p.text)}</p><div class="meta">${label}${p.mine?'<span class="mine">あなたの声</span>':''}</div>${rep}${p.status==='pending'?'<div class="pend">店長が確認中です。確認後にみんなに公開されます</div>':steps(p.status)}</div>
    ${p.status==='adopted'?'<div class="hanko" aria-hidden="true">採用</div>':''}</div>`;
 }
 $('filters').onclick = e => { const b = e.target.closest('button'); if (!b) return; filter = b.dataset.f;
@@ -421,11 +438,12 @@ $('send').onclick = async () => {
   const text = $('text').value.trim(); if (!text) return;
   const author = who === 'dept' && $('dept').value.trim() ? $('dept').value.trim() : '匿名';
   $('send').disabled = true;
-  try { await api('post', { type: 'req', text, author }); }
+  let res;
+  try { res = await api('post', { type: 'req', text, author }); }
   catch (err) { toast(errMsg(err)); $('send').disabled = false; return; }
   $('text').value = ''; closeSheet(); filter = 'mine';
   document.querySelectorAll('#filters button').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === 'mine'));
-  await loadUser(); toast('送りました。進み具合はここで見られます');
+  await loadUser(); toast(res && res.status === 'pending' ? '送りました。店長の確認後に公開されます' : '送りました。進み具合はここで見られます');
   $('filters').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
@@ -461,6 +479,8 @@ $('mgrList').onclick = async e => {
     if (act === 'del') {
       if (delArm !== id) { delArm = id; b.textContent = 'もう一度押すと消えます'; setTimeout(() => { if (delArm === id) { delArm = null; renderMgr(); } }, 3000); return; }
       delArm = null; await api('mgrDel', { id }); toast('削除しました');
+    } else if (act === 'approve') {
+      b.disabled = true; await api('mgrApprove', { id }); toast('公開しました。社員の画面に出ます');
     } else if (act === 'sold') {
       await api('mgrSold', { id, sold: $('sd' + id).value }); toast('販売数を更新しました');
     } else {
@@ -508,15 +528,18 @@ function satBar(x){
 }
 function renderMgr(){
   const posts = M.posts, reqs = posts.filter(p => p.type === 'req');
-  const open = posts.filter(p => p.status === 'open').length, adopted = reqs.filter(p => p.status === 'adopted').length;
-  $('stats').innerHTML = `<div class="stat"><div class="v">${posts.length}</div><div class="k">届いた声</div></div><div class="stat${open?' alert':''}"><div class="v">${open}</div><div class="k">未返信</div></div><div class="stat"><div class="v">${adopted}</div><div class="k">採用</div></div>`;
+  const open = posts.filter(p => p.status === 'open' || p.status === 'pending').length, adopted = reqs.filter(p => p.status === 'adopted').length;
+  $('stats').innerHTML = `<div class="stat"><div class="v">${posts.length}</div><div class="k">届いた声</div></div><div class="stat${open?' alert':''}"><div class="v">${open}</div><div class="k">未対応</div></div><div class="stat"><div class="v">${adopted}</div><div class="k">採用</div></div>`;
 
   const keep = {}; document.querySelectorAll('#mgrList input').forEach(i => { keep[i.id] = i.value; });
-  const items = posts.filter(p => mfilter === 'all' || p.status === 'open').sort((a, b) => b.likes - a.likes || b.ts - a.ts);
+  const items = posts.filter(p => mfilter === 'all' || p.status === 'open' || p.status === 'pending')
+    .sort((a, b) => (b.status === 'pending') - (a.status === 'pending') || b.likes - a.likes || b.ts - a.ts);
   $('mgrList').innerHTML = items.length ? items.map(p => {
     const tags = classify(p.text).map(c => `<span class="tag">${c}</span>`).join('');
     let body = '';
-    if (p.status === 'open') {
+    if (p.status === 'pending') {
+      body = `<div class="acts"><button class="approve" data-act="approve" data-id="${p.id}">公開する</button></div>`;
+    } else if (p.status === 'open') {
       body = `<div class="quick">${QUICK.map(q => `<button data-q data-id="${p.id}">${q}</button>`).join('')}</div>
       <input class="rp" type="text" id="rp${p.id}" maxlength="200" placeholder="返信（時期か次の動きを一言）" aria-label="返信">
       <div class="acts"><button class="consider" data-act="considered" data-id="${p.id}">検討します</button>${p.type==='req'?`<button class="adopt" data-act="adopted" data-id="${p.id}">採用する</button>`:''}</div>`;
@@ -524,8 +547,8 @@ function renderMgr(){
       body = `<div class="done-note"><b>${p.status==='adopted'?'採用済':'検討中'}</b>　${esc(p.reply)}</div>`;
       if (p.status === 'adopted') body += `<div class="acts"><label for="sd${p.id}" style="font-size:13px;color:var(--sub)">販売数</label><input type="number" min="0" id="sd${p.id}" value="${p.sold||0}"><button data-act="sold" data-id="${p.id}" style="flex:0 0 auto;padding:6px 14px">更新</button></div>`;
     }
-    return `<div class="mgr"><div class="top2"><div>${tags}<p class="req">${esc(p.text)}</p><div class="meta">${p.type==='req'?'リクエスト':'ひとこと'}　${esc(p.author)}</div></div>${p.type==='req'?`<div class="likes">♥${p.likes}</div>`:''}</div>${body}<button class="del" data-act="del" data-id="${p.id}">この声を削除</button></div>`;
-  }).join('') : `<div class="empty">${mfilter==='open'?'未返信の声はありません。おつかれさまでした。':'まだ声が届いていません。'}</div>`;
+    return `<div class="mgr"><div class="top2"><div>${p.status==='pending'?'<span class="badge-p">承認待ち</span>':''}${tags}<p class="req">${esc(p.text)}</p><div class="meta">${p.type==='req'?'リクエスト':'ひとこと'}　${esc(p.author)}</div></div>${p.type==='req'?`<div class="likes">♥${p.likes}</div>`:''}</div>${body}<button class="del" data-act="del" data-id="${p.id}">この声を削除</button></div>`;
+  }).join('') : `<div class="empty">${mfilter==='open'?'未対応の声はありません。おつかれさまでした。':'まだ声が届いていません。'}</div>`;
   Object.keys(keep).forEach(k => { if ($(k) && keep[k] && $(k).type === 'text') $(k).value = keep[k]; });
 
   $('lastSync').textContent = M.smaregi ? ('最終：' + (M.lastSync || 'まだ')) : 'スマレジ未設定';
@@ -570,7 +593,7 @@ function renderMgr(){
   } else {
     $('userView').hidden = false; $('fabwrap').hidden = false;
     await loadUser();
-    setInterval(() => { if (document.visibilityState === 'visible' && !$('sheet').classList.contains('on') && !document.activeElement.matches('input,textarea')) loadUser(); }, 30000);
+    // 自動更新はしない。開いたとき・戻ってきたとき・送信したあとに最新にする
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') loadUser(); });
   }
 })();
