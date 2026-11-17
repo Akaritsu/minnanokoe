@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>みんなの声</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- 見出し用フォントは使う文字だけ読み込む（本文はスマホ標準のフォントで軽く） -->
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap&text=%E3%81%BF%E3%82%93%E3%81%AA%E3%81%AE%E5%A3%B0%E3%81%A7%E3%80%81%E3%83%A1%E3%83%8B%E3%83%A5%E3%83%BC%E3%81%8C%E5%A4%89%E3%82%8F%E3%82%8B%E3%80%82%E4%BB%8A%E9%80%B1%E6%8E%A1%E7%94%A80123456789%25" rel="stylesheet">
 <script src="config.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" charset="utf-8"></script>
 <style>
@@ -24,7 +27,7 @@
   }
 }
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;font-size:15px;line-height:1.7;padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif;font-size:15px;line-height:1.7;padding-top:env(safe-area-inset-top,0px)}
 button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 button:disabled{cursor:default}
@@ -33,7 +36,7 @@ button:disabled{cursor:default}
 .top{display:flex;justify-content:space-between;align-items:center;padding:14px 0 4px}
 .store{font-size:13px;color:var(--sub);margin:0;font-weight:700}
 .badge{font-size:11px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--sub)}
-h1{font-family:"Dela Gothic One","Zen Kaku Gothic New",sans-serif;font-weight:400;font-size:26px;line-height:1.35;margin:6px 0 18px}
+h1{font-family:"Dela Gothic One","Hiragino Sans",sans-serif;font-weight:400;font-size:26px;line-height:1.35;margin:6px 0 18px}
 h2{font-size:16px;margin:28px 0 10px;display:flex;justify-content:space-between;align-items:baseline}
 h2 small{font-size:12px;color:var(--sub);font-weight:400}
 .hint{color:var(--sub);font-size:13px;margin:0 0 10px}
@@ -347,12 +350,20 @@ const errMsg = e => ERR[e && e.message] || FAIL;
 let S = { menu: [], myRatings: {}, posts: [] };
 let openItem = null, showAll = false, filter = 'pop', busy = false;
 
+const CACHE_KEY = 'mv-state1';
+function showCached(){
+  try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c && c.day === new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)) { S = c; status(''); applyState(); return true; } } catch (e) {}
+  return false;
+}
+function applyState(){
+  $('aboutApproval').hidden = !S.approval;
+  $('sheetHint').textContent = S.approval ? '店長が確認してから公開します。いいねが多いものから毎週検討します。' : 'いいねが多いものから、店長が毎週検討します。';
+  render();
+}
+function setState(d){ S = d; try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {} status(''); applyState(); }
 async function loadUser(){
   try {
-    S = await api('state'); status('');
-    $('aboutApproval').hidden = !S.approval;
-    $('sheetHint').textContent = S.approval ? '店長が確認してから公開します。いいねが多いものから毎週検討します。' : 'いいねが多いものから、店長が毎週検討します。';
-    render();
+    setState(await api('state')); return;
   }
   catch (e) { if (!S.posts.length) status('データを読み込めませんでした。開き直してください。'); }
 }
@@ -391,7 +402,7 @@ $('menuList').onclick = async e => {
     const k = +nb.dataset.note, inp = $('note_' + k), v = inp.value.trim();
     if (!v) { openItem = null; renderMenu(); toast('評価を送りました'); return; }  // ひとことは任意。空なら閉じるだけ
     nb.disabled = true;
-    try { await api('post', { type: 'comment', text: '【' + S.menu[k].item + '】' + v, author: '匿名' }); inp.value = ''; openItem = null; renderMenu(); toast('ひとことも送りました。ありがとうございます'); }
+    try { const res = await api('post', { type: 'comment', text: '【' + S.menu[k].item + '】' + v, author: '匿名' }); inp.value = ''; openItem = null; if (res && res.state) setState(res.state); else renderMenu(); toast('ひとことも送りました。ありがとうございます'); }
     catch (err) { toast(errMsg(err)); }
     nb.disabled = false; return;
   }
@@ -423,6 +434,7 @@ $('list').onclick = async e => {
 };
 
 function render(){
+  try { if (S && S.day) localStorage.setItem(CACHE_KEY, JSON.stringify(S)); } catch (e) {}
   renderMenu();
   const made = S.posts.filter(p => p.status === 'adopted').sort((a, b) => b.ts - a.ts);
   $('madeSec').hidden = !made.length; $('madeCount').textContent = made.length + '件';
@@ -452,7 +464,8 @@ $('send').onclick = async () => {
   catch (err) { toast(errMsg(err)); $('send').disabled = false; return; }
   $('text').value = ''; closeSheet(); filter = 'mine';
   document.querySelectorAll('#filters button').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === 'mine'));
-  await loadUser(); toast(res && res.status === 'pending' ? '送りました。店長の確認後に公開されます' : '送りました。進み具合はここで見られます');
+  if (res && res.state) setState(res.state); else await loadUser();
+  toast(res && res.status === 'pending' ? '送りました。店長の確認後に公開されます' : '送りました。進み具合はここで見られます');
   $('filters').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
@@ -599,6 +612,7 @@ function renderMgr(){
 (async function boot(){
   $('storeName').textContent = CFG.STORE_NAME || '';
   if (DEMO) { $('modeBadge').hidden = false; $('modeBadge').textContent = MGR ? 'デモ（暗証番号 1234）' : 'デモ表示'; }
+  if (!MGR) { $('userView').hidden = false; $('fabwrap').hidden = false; showCached(); }  // 前回の内容をすぐ出して、裏で最新に
   try { if (!(await initAuth())) return; }
   catch (e) { status('LINEとの接続に失敗しました。LINEアプリから開き直してください。'); return; }
   if (MGR) {
