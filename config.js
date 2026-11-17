@@ -3,7 +3,7 @@ window.CONFIG = {
   // GASを「ウェブアプリ」としてデプロイしたときのURL（https://script.google.com/macros/s/.../exec）
   GAS_URL: 'https://script.google.com/macros/s/AKfycbwDIeNXJvNRof4MQXL65Vwj1e3aXAP7ufshgdLbW2lGHn2KIBXdlwmL_HTXkXHvtlYYLw/exec',
   // LINE Developers で作った LIFF ID（例：2001234567-AbCdEfGh）。空のあいだはテストモード
-  LIFF_ID: '',
+  LIFF_ID: '2012652561-yKIk38zd',
   STORE_NAME: 'café THE PERCH',
 };
 // GAS_URL が空のときは、画面の確認用にサンプルデータで動きます（保存はされません）
